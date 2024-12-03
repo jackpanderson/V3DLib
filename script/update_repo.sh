@@ -17,7 +17,7 @@ function update_repo() {
   get_version
   if [ "$expected_version" == "$cur_version" ]; then
   #  echo "Versions match"
-    exit 0  # all is well
+    return 0  # all is well
   else
     echo $repo current version: $cur_version
   fi
@@ -45,7 +45,7 @@ function update_repo() {
     echo "ERROR: WebGen versions do not match! current: $cur_version, expected: $expected_version"
     echo "  ... perhaps you need to update the expected version number?"
     echo
-    exit 1
+    return 1
   fi
 }
 

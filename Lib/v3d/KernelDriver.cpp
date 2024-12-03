@@ -692,7 +692,7 @@ Instructions encode_init() {
 }
 
 
-#ifdef DEBUG
+// #ifdef DEBUG
 
 /**
  * Check assumption: uniform loads are always at the top of the instruction list.
@@ -725,7 +725,7 @@ bool checkUniformAtTop(V3DLib::Instr::List const &instrs) {
   return true;
 }
 
-#endif  // DEBUG
+// #endif  // DEBUG
 
 
 /**

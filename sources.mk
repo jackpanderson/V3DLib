@@ -117,6 +117,7 @@ EXAMPLES := \
   Rot3D  \
   Matrix  \
   detectPlatform  \
+  Hello2
 
 # support files for examples
 EXAMPLES_EXTRA := \
