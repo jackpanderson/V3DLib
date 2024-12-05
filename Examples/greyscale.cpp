@@ -2,13 +2,17 @@
 #include "Support/Settings.h"
 #include <iostream>
 #include <chrono>
+#include <string.h>
 
 using namespace V3DLib;
 using namespace std;
 
+// void greyscaleGPU(Int ops, Int::Ptr grey_o, Int::Ptr red, Int::Ptr green, Int::Ptr blue);
+
 V3DLib::Settings settings;
 
 #define OPS 16
+#define NUM_QPUS 8
 
 // VIDEOCODE KERNEL BABY
 void greyscaleGPU(Int ops, Int::Ptr grey_o, Int::Ptr red, Int::Ptr green, Int::Ptr blue) {                          // The kernel definition
@@ -25,7 +29,6 @@ void greyscaleGPU(Int ops, Int::Ptr grey_o, Int::Ptr red, Int::Ptr green, Int::P
 
   // BoolExpr::bexpr
   For ( Int i = me()*OPS , (i < ops*OPS) , i += OPS*numQPUs()) 
-    // THIS IS A VECTOR OP ON 16 ELEMENTS RAAHHHHHHHHHHHHH
     // Load Ints from Memory
     receive(red_int);
     receive(green_int);
@@ -105,58 +108,44 @@ void hello1(Int ops, Int::Ptr grey_o, Int::Ptr red, Int::Ptr green, Int::Ptr blu
   End
 }
 
-
-void doGPU(char * red, char * green, char * blue, char * grey, int vectorSize) { //vector size should be (total image pixels)/4
-  
+//template <typename... ts>
+void initGPU () {
   const char* arr[] = {"idk"};
   settings.init(1, arr);
+}
 
-  int numQPUs = 8;
-
-  auto k = compile(greyscaleGPU);                       
-  k.setNumQPUs(numQPUs);
-
-
+template <typename... ts>
+void doGPU(Kernel<ts...> * k, char * red, char * green, char * blue, char * grey, int vectorSize) { //vector size should be (total image pixels)/4
+  std::chrono::duration<double> elapsed_seconds;
+  
   Int::Array vGrey(vectorSize); 
   Int::Array vRed(vectorSize);
   Int::Array vGreen(vectorSize);
   Int::Array vBlue(vectorSize);
 
-
-
-  int inArrBasePos;
-
-  for (int i = 0; i < vectorSize; i += 1) {
-    inArrBasePos = i << 2;
-    vRed[i]   = red[inArrBasePos]   | (red[inArrBasePos + 1] << 8)   | (red[inArrBasePos + 2] << 16)   | (red[inArrBasePos + 3] << 24);
-    vBlue[i]  = blue[inArrBasePos]  | (blue[inArrBasePos + 1] << 8)  | (blue[inArrBasePos + 2] << 16)  | (blue[inArrBasePos + 3] << 24);
-    vGreen[i] = green[inArrBasePos] | (green[inArrBasePos + 1] << 8) | (green[inArrBasePos + 2] << 16) | (green[inArrBasePos + 3] << 24);
-  }
-
+  memcpy((int32_t *)(vRed.ptr()), (int32_t *) red, vectorSize * sizeof(int32_t));
+  memcpy((int32_t *)(vGreen.ptr()), (int32_t *) green, vectorSize * sizeof(int32_t));
+  memcpy((int32_t *)(vBlue.ptr()), (int32_t *) blue, vectorSize * sizeof(int32_t));
 
   int ops_per_qpu = (vectorSize << 2)/(OPS);
   
-  k.load(ops_per_qpu, &vGrey, &vRed, &vGreen, &vBlue);
+  (*k).load(ops_per_qpu, &vGrey, &vRed, &vGreen, &vBlue);
+  auto start = chrono::system_clock::now();
+  settings.process(*k);
+  auto end = chrono::system_clock::now();
+  elapsed_seconds = end-start;
+  printf("Kernel Process elapsed time (ms): %.10f\n", elapsed_seconds.count() * 1000);
 
-  settings.process(k);
-
-  for (int i = 0; i < (vectorSize); i += 4) {
-    auto greyVal = vGrey[i];
-    grey[i] = greyVal & 0xFF;
-    grey[i + 1] = (greyVal >> 8)  & 0xFF;
-    grey[i + 2] = (greyVal >> 16) & 0xFF;
-    grey[i + 3] = (greyVal >> 24) & 0xFF;
-  }
+  memcpy(grey, (int32_t *)(vGrey.ptr()), vectorSize * sizeof(int32_t));
 }
 
 int main(int argc, const char *argv[]) {
   //settings.init(argc, argv);
-  
-  int imgSize = 1280*256;
-  
-  // for (int i = 0; i < size; i++){
-  //   red[i] = ((int*)rc)[i]
-  // }
+  initGPU();
+  auto k = compile(greyscaleGPU);                       
+  k.setNumQPUs(NUM_QPUS);
+
+  int imgSize = 1280*590;
 
   char red[imgSize];
   char blue[imgSize];
@@ -174,23 +163,23 @@ int main(int argc, const char *argv[]) {
     green [i] = rand_num + (rand_num << 8) + (rand_num << 16) + (rand_num << 24);
   }
   
+  std::chrono::duration<double> elapsed_seconds;
+  for (int i = 0; i < 10; i++) {
+    // Invoke the kernel
+    auto start = chrono::system_clock::now();
+    doGPU(&k, red, green, blue, grey, imgSize >> 2);
+    auto end = chrono::system_clock::now();
+    
+    std::chrono::duration<double, std::milli> elapsed_ms = end-start;
+    std::cout << "Duration (ms)" << (double)elapsed_ms.count()<< std::endl;
 
-      std::chrono::duration<double> elapsed_seconds;
-      for (int i = 0; i < 1; i++) {
-      auto start = chrono::system_clock::now();
-        // Invoke the kernel
-        doGPU(red, green, blue, grey, imgSize >> 2);
-      auto end = chrono::system_clock::now();
-      elapsed_seconds = end-start;
-      }
-
-
+  }
 
   for (int i = 0; i < (int) 64; i++) {  // Display the result
   // for (int i = 0; i < (int) out_array.size(); i++) {  // Display the result
-    printf("%i: %X\n", i, grey[i]);
+    //printf("%i: %X\n", i, grey[i]);
   }
-    printf("elapsed time (ms): %.10f\n", elapsed_seconds.count() * 1000);
+    
 
   return 0;
 }
