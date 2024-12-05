@@ -82,7 +82,8 @@ CXX_FLAGS = \
  -Wall \
  -Wconversion \
  -Wno-psabi \
- -I $(ROOT) $(INCLUDE_EXTERN) -MMD -MP -MF"$(@:%.o=%.d)"
+ -I $(ROOT) $(INCLUDE_EXTERN) -MMD -MP -MF"$(@:%.o=%.d)" \
+  -g -O0 -I /usr/include/opencv4 
 
 # Object directory
 OBJ_DIR := obj
@@ -208,7 +209,7 @@ $(OBJ_DIR)/%.o: %.c | init
 $(OBJ_DIR)/bin/%: $(OBJ_DIR)/Examples/%.o $(EXAMPLES_OBJ) $(V3DLIB) $(LIB_DEPEND)
 	@echo Linking $@...
 	@mkdir -p $(@D)
-	@$(LINK) $^ $(LIBS) -o $@
+	@$(LINK) $^ $(LIBS)  -o $@ -lopencv_core -lopencv_videoio -lopencv_imgproc -lopencv_highgui -lopencv_ml -lopencv_video -lopencv_features2d -lopencv_calib3d -lopencv_objdetect -lopencv_flann -lopencv_imgcodecs -lpthread \
 
 $(OBJ_DIR)/bin/%: $(OBJ_DIR)/Tools/%.o $(V3DLIB) $(LIB_DEPEND)
 	@echo Linking $@...
